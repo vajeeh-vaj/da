@@ -27,9 +27,46 @@ const db=dbReady?window.supabase.createClient(SB_URL,SB_KEY):null;
 const defaults={settings:{brand:'Depthology®',heroEyebrow:'Independent creative studio',availability:'Available for select projects',heroTitle:'DESIGN<br><span class="stroke">BEYOND</span><br>SURFACE<span style="color:var(--accent)">.</span>',heroCopy:'<strong>Depthology®</strong> builds distinctive visual identities and meaningful design systems for brands ready to be remembered.',aboutTitle:'Good design<br>goes <span>deeper.</span>',aboutText:'Depthology is an independent creative practice exploring the space where strategy meets visual expression. We shape identities that feel considered, communicate clearly and stay memorable.',contactCopy:'Have a project, a question or a collaboration in mind? Tell us a little about it. We read every message.',instagram:'https://www.instagram.com/',email:'vaajeeh2@gmail.com'},projects:[{id:'demo1',title:'Morrow — visual identity',category:'Brand Identity',description:'A fresh visual world for a modern lifestyle brand.',image:'',symbol:'M',color:'#c8ff43',order:1},{id:'demo2',title:'Form / function',category:'Logo',description:'A minimal mark designed around movement and balance.',image:'',symbol:'F',color:'#9a7cff',order:2},{id:'demo3',title:'After Hours',category:'Poster',description:'An expressive campaign poster for a late-night culture event.',image:'',symbol:'AH',color:'#ff8f70',order:3},{id:'demo4',title:'NŌVA — brand system',category:'Brand Identity',description:'A flexible identity system with a confident visual voice.',image:'',symbol:'N',color:'#82d9e8',order:4}],faqs:[{q:'What can I hire Depthology for?',a:'Logo design, complete brand identity systems, poster design and selected creative collaborations.'},{q:'How do I start a project?',a:'Use the contact form with a short description of your project, timeline and what you need. We will follow up by email.'},{q:'How much does a project cost?',a:'Pricing depends on scope, deliverables and timeline. Send a brief and we can discuss a suitable quote.'},{q:'Can I request revisions?',a:'Yes. The revision process and number of rounds are agreed before work begins, so expectations stay clear.'},{q:'How do I get in touch quickly?',a:'Use the DM for works link or send a message through the contact form on this page.'}]};
 let content=JSON.parse(JSON.stringify(defaults));
 function safe(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-async function loadContent(){if(db){try{const {data,error}=await db.from('site_content').select('payload').eq('id',1).maybeSingle();if(!error&&data?.payload)content={...defaults,...data.payload,settings:{...defaults.settings,...(data.payload.settings||{})}};const {data:projects}=await db.from('portfolio_projects').select('*').order('sort_order');if(projects?.length)content.projects=projects.map(p=>({id:p.id,title:p.title,category:p.category,description:p.description,image:p.image_url||'',symbol:p.symbol||'D',color:p.color||'#c8ff43',order:p.sort_order||0}));const {data:faqs}=await db.from('portfolio_faqs').select('*').order('sort_order');if(faqs?.length)content.faqs=faqs.map(f=>({q:f.question,a:f.answer}));}catch(e){console.warn('Using starter content:',e.message)}}renderAll()}
+async function loadContent(){if(db){try{const {data,error}=await db.from('site_content').select('payload').eq('id',1).maybeSingle();if(!error&&data?.payload)content={...defaults,...data.payload,settings:{...defaults.settings,...(data.payload.settings||{})}};const {data:projects}=await db.from('portfolio_projects').select('*').order('sort_order');if(projects?.length)content.projects=projects.map(p=>({id:p.id,title:p.title,category:p.category,
+description:p.description,image:p.image_url||'',imageSize:(p.description||'').match(/\[\[IMAGE_SIZE:(\d+)\]\]/)?.[1]||100
+,symbol:p.symbol||'D',color:p.color||'#c8ff43',order:p.sort_order||0}));const {data:faqs}=await db.from('portfolio_faqs').select('*').order('sort_order');if(faqs?.length)content.faqs=faqs.map(f=>({q:f.question,a:f.answer}));}catch(e){console.warn('Using starter content:',e.message)}}renderAll()}
 function renderAll(){const s=content.settings||defaults.settings;document.title=(s.brand||'Depthology')+' — Design Beyond Surface';document.getElementById('brandLogo').innerHTML=safe(s.brand||'Depthology®').replace('®','<span>®</span>');document.getElementById('heroEyebrow').textContent=s.heroEyebrow||'';document.getElementById('availabilityText').textContent=s.availability||'';document.getElementById('heroTitle').innerHTML=s.heroTitle||defaults.settings.heroTitle;document.getElementById('heroCopy').innerHTML=s.heroCopy||'';document.getElementById('aboutTitle').innerHTML=s.aboutTitle||'';document.getElementById('aboutText').textContent=s.aboutText||'';document.getElementById('contactCopy').textContent=s.contactCopy||'';document.getElementById('emailLink').href='mailto:'+(s.email||'');document.getElementById('emailLink').textContent=(s.email||'')+' ↗';document.getElementById('dmLink').href=s.instagram||'#contact';renderWorks('All');renderFaqs();document.getElementById('year').textContent=new Date().getFullYear()}
-function renderWorks(filter){const grid=document.getElementById('worksGrid');let list=(content.projects||[]).filter(p=>filter==='All'||p.category===filter).sort((a,b)=>(a.order||0)-(b.order||0));grid.innerHTML=list.length?list.map(p=>`<article class="work-card reveal"><div class="work-art" style="background:${safe(p.color||'#191919')};">${p.image?`<img loading="lazy" src="${safe(p.image)}" alt="${safe(p.title)}">`:`<div class="art-placeholder"><div class="art-letter" style="color:${safe(p.color||'var(--accent)')}">${safe(p.symbol||'D')}</div></div>`}</div><div class="work-meta"><div><h3>${safe(p.title)}</h3><p>${safe(p.description||'')}</p></div><span class="work-type">${safe(p.category)}</span></div></article>`).join(''):'<div class="empty-state">No projects in this category yet. Check back soon.</div>';observeReveals()}
+
+function renderWorks(filter){
+  const grid=document.getElementById('worksGrid');
+
+  let list=(content.projects||[])
+    .filter(p=>filter==='All'||p.category===filter)
+    .sort((a,b)=>(a.order||0)-(b.order||0));
+
+  grid.innerHTML=list.length?list.map(p=>{
+    const match=(p.description||'').match(/\[\[IMAGE_SIZE:(\d+)\]\]/);
+    const size=match?Number(match[1]):Number(p.imageSize||100);
+
+    const desc=(p.description||'')
+      .replace(/\s*\[\[IMAGE_SIZE:\d+\]\]\s*/g,'')
+      .trim();
+
+    return `<article class="work-card reveal">
+      <div class="work-art" style="background:${safe(p.color||'#191919')};">
+        ${p.image
+          ?`<img loading="lazy" src="${safe(p.image)}" alt="${safe(p.title)}" style="width:${size}%;height:${size}%;object-fit:contain;">`
+          :`<div class="art-placeholder"><div class="art-letter" style="color:${safe(p.color||'var(--accent)')}">${safe(p.symbol||'D')}</div></div>`
+        }
+      </div>
+      <div class="work-meta">
+        <div>
+          <h3>${safe(p.title)}</h3>
+          <p>${safe(desc)}</p>
+        </div>
+        <span class="work-type">${safe(p.category)}</span>
+      </div>
+    </article>`;
+  }).join(''):'<div class="empty-state">No projects in this category yet. Check back soon.</div>';
+
+  observeReveals();
+}
+
 function renderFaqs(){const list=document.getElementById('faqList'),opts=document.getElementById('faqOptions');list.innerHTML=(content.faqs||[]).map((f,i)=>`<div class="faq-item"><button class="faq-q" aria-expanded="false"><span>${safe(f.q)}</span><span>＋</span></button><div class="faq-a">${safe(f.a)}</div></div>`).join('');list.querySelectorAll('.faq-q').forEach(b=>b.addEventListener('click',()=>{const item=b.parentElement;item.classList.toggle('open');b.setAttribute('aria-expanded',item.classList.contains('open'))}));opts.innerHTML=(content.faqs||[]).map((f,i)=>`<button class="faq-option" data-i="${i}">${safe(f.q)}</button>`).join('');opts.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const f=content.faqs[Number(b.dataset.i)];const ans=document.getElementById('assistantAnswer');ans.textContent=f.a;ans.classList.add('show')}))}
 document.getElementById('filters').addEventListener('click',e=>{const b=e.target.closest('[data-filter]');if(!b)return;document.querySelectorAll('.filter').forEach(x=>x.classList.toggle('active',x===b));renderWorks(b.dataset.filter)});
 document.getElementById('assistantToggle').addEventListener('click',()=>document.getElementById('assistantPanel').classList.toggle('show'));
